@@ -15,6 +15,7 @@ class ZTTopology(Topo):
         pep = self.addHost('PEP', ip='10.0.0.3')
         resource = self.addHost('Resource', ip='10.0.0.4')
         ca_node = self.addHost('CA', ip='10.0.0.5')
+        
 
         # Switches
         s1 = self.addSwitch('s1')
@@ -139,35 +140,41 @@ class CustomCLI(CLI):
             print(result)
 
 
-# --- NETWORK EXECUTION ---
 
 def run():
     topo = ZTTopology()
-    net = Mininet(topo=topo, controller=lambda name: RemoteController(name, ip='127.0.0.1', port=6633))
-    
+
+    net = Mininet(
+        topo=topo,
+        controller=lambda name: RemoteController(name, ip='192.168.68.127', port=6633)
+    )
+
+    # Add NAT with proper IP inside Mininet subnet
+    # nat = net.addNAT(ip='10.0.0.254/24')
+
     print("[*] Starting Network")
     net.start()
 
-    # Get host objects
+    # Configure NAT (enables ip_forward + MASQUERADE automatically)
+    # nat.configDefault()
+
+    # Get hosts
     client = net.get('Intiating')
-    gateway = net.get('PEP')
+    pdp = net.get('PDP')
+    pep = net.get('PEP')
 
-    print("[*] Configuring Gateway (PEP) for NAT...")
-    gateway.cmd('sysctl -w net.ipv4.ip_forward=1')
-    gateway.cmd('iptables -t nat -A POSTROUTING -o PEP-eth0 -j MASQUERADE')
+    # Add default route only for PDP (so it can reach Ubuntu host)
+    pdp.cmd('ip route add default via 10.0.0.254')
 
-    print("[*] Configuring Client (Intiating) Route...")
-    client.cmd('ip route add 10.0.0.4 via 10.0.0.3')
-
-    # Optional: Mount command as requested
-    for h in [net.get('Intiating'), net.get('PDP')] :
-        h.cmd('mount --bind /home/ztnaresource/Desktop/Emulator/mininet /home/zerotrust/Desktop/ztna')
+    # Optional: if client also needs internet
+    # client.cmd('ip route add default via 10.0.0.254')
 
     print("[*] Network Ready. Custom CLI starting...")
-    CustomCLI(net) # Use our Custom class here
+    CustomCLI(net)
 
     print("[*] Stopping Network")
     net.stop()
+
 
 if __name__ == '__main__':
     setLogLevel('info')

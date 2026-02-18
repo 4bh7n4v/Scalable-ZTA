@@ -3,19 +3,20 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import MAIN_DISPATCHER, CONFIG_DISPATCHER, set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet, ethernet, arp, ipv4
+from ryu.lib.packet import tcp
 import requests
 import time
 
 # ----------------- CONFIG ----------------- #
 
-AUTH_API_URL = "http://127.0.0.1:5000/auth"   # Flask policy API
+AUTH_API_URL = "http://10.0.0.2:5000/auth"   # Flask policy API
 
 CLIENT_IP     = "10.0.0.1"   # h1
 CONTROLLER_IP = "10.0.0.2"   # h2 (host, NOT Ryu)
 GATEWAY_IP    = "10.0.0.3"   # h3
-RESOURCE_IP   = "10.0.0.130"
+RESOURCE_IP   = "10.0.0.4"   # h4 (currently blocked)
 CA_IP         = "10.0.0.5"
-
+VM_ROOT_IP     = "10.0.0.100"
 
 class ZTController(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -36,7 +37,7 @@ class ZTController(app_manager.RyuApp):
             return
 
         try:
-            resp = requests.get(AUTH_API_URL, timeout=0.5).json()
+            resp = requests.get(AUTH_API_URL, timeout=5).json()
             self.authenticated = resp.get("authenticated", False) # if authenticated is not found return False
         except Exception as e:
             self.logger.error(f"Auth API error: {e}")
@@ -75,7 +76,7 @@ class ZTController(app_manager.RyuApp):
         )
         datapath.send_msg(mod)
 
-    def is_always_allowed_pair(self, src_ip, dst_ip):
+    def is_always_allowed_pair(self, src_ip, dst_ip, tcp_pkt):
         """Flows that are allowed even before authentication."""
         pair = {src_ip, dst_ip}
         
@@ -90,6 +91,19 @@ class ZTController(app_manager.RyuApp):
             return True
         # 4. CA <-> Gateway (For CRL/Revocation checks)
         if pair == {CA_IP, GATEWAY_IP}:
+            return True
+        # if pair == {CONTROLLER_IP,SDN_IP}:
+        #     return True
+        # if src_ip == CONTROLLER_IP and dst_ip == "192.168.68.127" and tcp_pkt and tcp_pkt.dst_port == 5000:
+        #     return True
+
+        # 1. NEW: Management Traffic (Ryu <-> PDP API)
+        # Allows the SDN Controller to talk to the Policy API on h2
+        if VM_ROOT_IP in pair and CONTROLLER_IP in pair:
+            # Optional: strictly check for port 5000
+            if tcp_pkt and (tcp_pkt.src_port == 5000 or tcp_pkt.dst_port == 5000):
+                return True
+            # Also allow ARP/ICMP for this pair for discovery
             return True
         return False
 
@@ -106,13 +120,13 @@ class ZTController(app_manager.RyuApp):
         
         return False
 
-    def is_flow_allowed(self, src_ip, dst_ip):
+    def is_flow_allowed(self, src_ip, dst_ip, tcp_pkt):
         """
         Decide if a flow between src_ip and dst_ip is allowed according to
         your Zero Trust workflow.
         """
         # 1) Always allow client <-> controller-host
-        if self.is_always_allowed_pair(src_ip, dst_ip):
+        if self.is_always_allowed_pair(src_ip, dst_ip, tcp_pkt):
             return True
 
         # 2) For other flows, check authentication
@@ -172,6 +186,7 @@ class ZTController(app_manager.RyuApp):
         # Extract IP-layer info if present
         ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
         arp_pkt = pkt.get_protocol(arp.arp)
+        tcp_pkt = pkt.get_protocol(tcp.tcp)
 
         src_ip = None
         dst_ip = None
@@ -188,7 +203,7 @@ class ZTController(app_manager.RyuApp):
             return
 
         # Decide if this IP pair is allowed under Zero Trust policy
-        if not self.is_flow_allowed(src_ip, dst_ip):
+        if not self.is_flow_allowed(src_ip, dst_ip, tcp_pkt):
             # Install a short-lived drop flow to avoid repeated packet_in
             match = parser.OFPMatch(
                 eth_type=eth.ethertype,
@@ -217,13 +232,37 @@ class ZTController(app_manager.RyuApp):
         }
 
         # Try to match on IPs for IPv4/ARP for better specificity
+
+        
+
+        # if ipv4_pkt:
+        #     match_fields['eth_type'] = 0x0800
+        #     match_fields['ipv4_src'] = src_ip
+        #     match_fields['ipv4_dst'] = dst_ip
+        #     match_fields['ip_proto'] = ipv4_pkt.proto
+
+        #     if tcp_pkt:
+        #         match_fields['tcp_src'] = tcp_pkt.src_port
+        #         match_fields['tcp_dst'] = tcp_pkt.dst_port
+        
+        # Build match fields
         if ipv4_pkt:
-            match_fields['ip_proto'] = ipv4_pkt.proto
-            match_fields['ipv4_src'] = src_ip
-            match_fields['ipv4_dst'] = dst_ip
+            match_fields = {
+                'eth_type': 0x0800,
+                'ipv4_src': src_ip,
+                'ipv4_dst': dst_ip
+            }
+
         elif arp_pkt:
-            match_fields['arp_spa'] = src_ip
-            match_fields['arp_tpa'] = dst_ip
+            match_fields = {
+                'eth_type': 0x0806,
+                'arp_spa': src_ip,
+                'arp_tpa': dst_ip
+            }
+
+        else:
+            return  # ignore other packet types
+
 
         match = parser.OFPMatch(**match_fields)
         self.add_flow(datapath, priority=50, match=match, actions=actions, idle_timeout=60)
