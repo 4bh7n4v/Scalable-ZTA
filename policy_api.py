@@ -1,3 +1,24 @@
+# from flask import Flask, jsonify
+
+# app = Flask(__name__)
+# AUTH_STATE = {"authenticated": False}
+
+# @app.get("/auth")
+# def auth():
+#     return jsonify(AUTH_STATE)
+
+# @app.get("/auth/allow")
+# def allow():
+#     AUTH_STATE["authenticated"] = True
+#     return jsonify({"status": "client authorized"})
+
+# @app.get("/auth/block")
+# def block():
+#     AUTH_STATE["authenticated"] = False
+#     return jsonify({"status": "client blocked"})
+
+# app.run(port=5000)
+
 from flask import Flask, jsonify
 app = Flask(__name__)
 AUTH_STATE = {"authenticated": False}

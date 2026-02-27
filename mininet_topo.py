@@ -140,23 +140,21 @@ class CustomCLI(CLI):
             print(result)
 
 
+# --- NETWORK EXECUTION ---
+
 
 def run():
     topo = ZTTopology()
 
     net = Mininet(
         topo=topo,
-        controller=lambda name: RemoteController(name, ip='192.168.68.127', port=6633)
+        controller=lambda name: RemoteController(name, ip='172.20.10.12', port=6633),
+        ipBase='10.0.0.0/24',
+        autoSetMacs=True
     )
-
-    # Add NAT with proper IP inside Mininet subnet
-    # nat = net.addNAT(ip='10.0.0.254/24')
 
     print("[*] Starting Network")
     net.start()
-
-    # Configure NAT (enables ip_forward + MASQUERADE automatically)
-    # nat.configDefault()
 
     # Get hosts
     client = net.get('Intiating')
@@ -166,15 +164,11 @@ def run():
     # Add default route only for PDP (so it can reach Ubuntu host)
     pdp.cmd('ip route add default via 10.0.0.254')
 
-    # Optional: if client also needs internet
-    # client.cmd('ip route add default via 10.0.0.254')
-
     print("[*] Network Ready. Custom CLI starting...")
     CustomCLI(net)
 
     print("[*] Stopping Network")
     net.stop()
-
 
 if __name__ == '__main__':
     setLogLevel('info')
