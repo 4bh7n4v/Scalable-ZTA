@@ -15,7 +15,8 @@ AUTH_API_URL = "http://10.0.0.2:5000/auth"
 CLIENT_IP     = "10.0.0.1"   # h1
 CONTROLLER_IP = "10.0.0.2"   # h2 (host, NOT Ryu)
 GATEWAY_IP    = "10.0.0.3"   # h3
-RESOURCE_IP   = "10.0.0.4"   # h4
+RESOURCE_IP   = "10.0.2.2"   # h4
+GATEWAY_IP_INF2 = "10.0.2.1"
 CA_IP         = "10.0.0.5"
 VM_ROOT_IP    = "10.0.0.100"
 
@@ -154,7 +155,7 @@ class ZTController(app_manager.RyuApp):
     def _auth_allowed(self, src_ip, dst_ip):
         pair = {src_ip, dst_ip}
         if pair == {CLIENT_IP, GATEWAY_IP}:   return True
-        if pair == {GATEWAY_IP, RESOURCE_IP}: return True
+        if pair == {GATEWAY_IP_INF2, RESOURCE_IP}: return True
         return False
 
     def _is_allowed(self, src_ip, dst_ip, tcp_pkt):
@@ -232,14 +233,14 @@ class ZTController(app_manager.RyuApp):
             fwd_match = parser.OFPMatch(eth_type=0x0806,
                                         arp_spa=src_ip, arp_tpa=dst_ip)
 
-        self.add_flow(datapath, 50, fwd_match, actions, idle_timeout=60)
+        self.add_flow(datapath, 50, fwd_match, actions, idle_timeout=30)
 
         if ipv4_pkt:   # reverse flow for IPv4 only
             self.add_flow(datapath, 50,
                           parser.OFPMatch(eth_type=0x0800,
                                          ipv4_src=dst_ip, ipv4_dst=src_ip),
                           [parser.OFPActionOutput(in_port)],
-                          idle_timeout=60)
+                          idle_timeout=30)
 
         if out_port == ofproto.OFPP_FLOOD:
             self.logger.info("ALLOW %s -> %s via FLOOD (MAC %s unknown) on switch %s",

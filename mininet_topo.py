@@ -12,20 +12,19 @@ class ZTTopology(Topo):
         # Hosts
         client = self.addHost('Intiating', ip='10.0.0.1')
         pdp = self.addHost('PDP', ip='10.0.0.2')
-        pep = self.addHost('PEP', ip='10.0.0.3')
-        resource = self.addHost('Resource', ip='10.0.0.4')
+        pep = self.addHost('PEP') 
+        resource = self.addHost('Resource', ip='10.0.2.2/24')
         ca_node = self.addHost('CA', ip='10.0.0.5')
-        
 
         # Switches
         s1 = self.addSwitch('s1')
         s2 = self.addSwitch('s2')
 
-        # Links [cite: 1, 3]
+        # Links 
         self.addLink(ca_node, s1)
         self.addLink(client, s1)
         self.addLink(pdp, s1)
-        self.addLink(s1, s2)
+        self.addLink(s1, pep)
         self.addLink(s2, pep)
         self.addLink(s2, resource)
 
@@ -123,7 +122,6 @@ class CustomCLI(CLI):
                 '-key /tmp/PDP_workspace/pdp.key '
                 '-CAfile /tmp/CA_workspace/ca.crt -Verify 1 &')
 
-        import time
         time.sleep(1)
 
         # --- PHASE 6: PEP connects to PDP ---
@@ -139,6 +137,9 @@ class CustomCLI(CLI):
             print("\n[ERROR] mTLS failed ❌")
             print(result)
 
+        # --- PHASE 7: Stop PDP mTLS Server ---
+        print("*** Phase 7: Closing OpenSSL server process")
+        pdp.cmd('pkill -f "openssl s_server"')
 
 # --- NETWORK EXECUTION ---
 
@@ -156,13 +157,19 @@ def run():
     print("[*] Starting Network")
     net.start()
 
-    # Get hosts
-    client = net.get('Intiating')
-    pdp = net.get('PDP')
+    # Get your gateway node
     pep = net.get('PEP')
 
-    # Add default route only for PDP (so it can reach Ubuntu host)
-    pdp.cmd('ip route add default via 10.0.0.254')
+    # Set eth0 to your untrusted side (connected to s1)
+    pep.setIP('10.0.0.3', prefixLen=24, intf='PEP-eth0')
+
+    # Set eth1 to your protected side (connected to s2)
+    pep.setIP('10.0.2.1', prefixLen=24, intf='PEP-eth1')
+
+    # Turn on IP forwarding so it acts as a router
+    pep.cmd('sysctl -w net.ipv4.ip_forward=1')
+    resource = net.get('Resource')
+    resource.cmd('ip route add default via 10.0.2.1')
 
     print("[*] Network Ready. Custom CLI starting...")
     CustomCLI(net)
