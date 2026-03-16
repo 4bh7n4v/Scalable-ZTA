@@ -64,11 +64,11 @@ This project demonstrates a Zero Trust Network Architecture (ZTNA) emulation usi
 
 **Phase 1 — Mininet Topology**
 
-![Phase 1 Topology](images/phase1_topology.png)
+![Phase 1 Topology](images/INTIAL_ZTNA.png)
 
 **Phase 2 — System in Action**
 
-![Phase 2 Running](images/phase2_running.png)
+![Phase 2 Running](images/UPSCALED_ZTNA.png)
 
 ---
 
