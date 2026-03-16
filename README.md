@@ -1,31 +1,5 @@
-# ZeroTrust_MininetSetup
-Zero Trust Network Architecture Emulation in Mininet For Scalabilty of the Working Project
+<img width="1909" height="933" alt="image" src="https://github.com/user-attachments/assets/181b5088-a2c3-47bb-8d4c-855e2b369765" />
 
-
-# Zero Trust Architecture Emulation using Mininet & Ryu
-
-This project demonstrates a **Zero Trust Network Architecture (ZTNA)** emulation using **Mininet** and the **Ryu SDN Controller**.  
-It models a 4-node topology with a gateway enforcing access control using SDN principles.
-
-The setup is designed to simulate:
-- Controller-driven authentication & policy enforcement
-- Gateway-based access mediation
-- Secure, segmented communication paths
-
----
-
-## 🧱 Topology Overview
-
-**Components:**
-- Client Node  
-- Gateway Node (single IP, acts as enforcement point)  
-- Resource/Server Node  
-- Policy/Controller Node  
-
-**Network:**
-- 2 OpenFlow switches  
-- Switches interconnected  
-- Gateway connected to both segments  
 
 ---
 
