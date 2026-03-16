@@ -242,7 +242,7 @@ def run():
 
     # ── Routing ──
     # Client reaches resource subnet via gateway
-    Client.cmd('ip route add 10.0.1.0/24 via 10.0.0.254 dev Initiating-eth0')
+    # Client.cmd('ip route add 10.0.1.0/24 via 10.0.0.254 dev Initiating-eth0')
 
     # Resource returns traffic via gateway
     Server.cmd('ip route add default via 10.0.1.254 dev Resource-eth0')
